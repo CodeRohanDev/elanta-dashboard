@@ -30,8 +30,21 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# Environment variables and credentials
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+.env.development.local
+.env.test.local
+.env.production.local
+*.key
+credentials.json
+service-account.json
+*-credentials.json
+*-key.json
+*firebase-adminsdk*.json
 
 # vercel
 .vercel
@@ -39,3 +52,19 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# IDE files
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+*.sublime-project
+*.sublime-workspace
+.vs/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
