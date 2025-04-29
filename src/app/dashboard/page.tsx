@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense, lazy } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
@@ -28,6 +28,9 @@ import {
   Legend,
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
+
+// Lazy load the low stock alerts component
+const LowStockAlerts = lazy(() => import('@/components/ui/LowStockAlerts'));
 
 // Register Chart.js components
 ChartJS.register(
@@ -57,35 +60,15 @@ export default function Dashboard() {
       if (!userData) return;
 
       try {
-        const storeId = userData.role === 'vendor' ? userData.storeId : null;
-        let ordersQuery;
-        let productsQuery;
-
-        // Query for orders
-        if (userData.role === 'admin') {
-          ordersQuery = query(
+        // Query for all orders and products without vendor filtering
+        const ordersQuery = query(
             collection(db, 'orders'),
             orderBy('createdAt', 'desc')
           );
-        } else {
-          // For vendors, filter by their store
-          ordersQuery = query(
-            collection(db, 'orders'),
-            where('storeId', '==', storeId),
-            orderBy('createdAt', 'desc')
-          );
-        }
 
-        // Query for products
-        if (userData.role === 'admin') {
-          productsQuery = query(collection(db, 'products'));
-        } else {
-          // For vendors, filter by their store
-          productsQuery = query(
-            collection(db, 'products'),
-            where('storeId', '==', storeId)
+        const productsQuery = query(
+          collection(db, 'products')
           );
-        }
 
         // Execute queries
         const [ordersSnapshot, productsSnapshot] = await Promise.all([
@@ -149,7 +132,7 @@ export default function Dashboard() {
   }, [userData]);
 
   // Chart configuration
-  const chartOptions = {
+  const chartOptions: any = {
     responsive: true,
     plugins: {
       legend: {
@@ -222,22 +205,22 @@ export default function Dashboard() {
     
     switch (status) {
       case 'pending':
-        colorClass = 'bg-yellow-100 text-yellow-800';
+        colorClass = 'bg-amber-100/50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300';
         break;
       case 'processing':
-        colorClass = 'bg-blue-100 text-blue-800';
+        colorClass = 'bg-blue-100/50 dark:bg-blue-950/50 text-blue-800 dark:text-blue-300';
         break;
       case 'shipped':
-        colorClass = 'bg-purple-100 text-purple-800';
+        colorClass = 'bg-purple-100/50 dark:bg-purple-950/50 text-purple-800 dark:text-purple-300';
         break;
       case 'delivered':
-        colorClass = 'bg-green-100 text-green-800';
+        colorClass = 'bg-green-100/50 dark:bg-green-950/50 text-green-800 dark:text-green-300';
         break;
       case 'cancelled':
-        colorClass = 'bg-red-100 text-red-800';
+        colorClass = 'bg-red-100/50 dark:bg-red-950/50 text-red-800 dark:text-red-300';
         break;
       default:
-        colorClass = 'bg-gray-100 text-gray-800';
+        colorClass = 'bg-secondary text-muted-foreground';
     }
     
     return (
@@ -247,23 +230,34 @@ export default function Dashboard() {
     );
   };
 
+  // Simple loading placeholder for lazy-loaded components
+  function LoadingPlaceholder() {
+    return (
+      <div className="rounded-lg border border-border bg-card p-4 shadow">
+        <div className="flex h-40 items-center justify-center">
+          <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-primary"></div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+        <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
         
         {/* Stats Cards */}
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {stats.map((stat) => (
-            <div key={stat.name} className="overflow-hidden rounded-lg bg-white shadow">
+            <div key={stat.name} className="overflow-hidden rounded-lg bg-card shadow">
               <div className="p-5">
                 <div className="flex items-center">
                   <div className={`flex-shrink-0 rounded-md p-3 ${stat.bgColor}`}>
                     <stat.icon className={`h-6 w-6 ${stat.iconColor}`} />
                   </div>
                   <div className="ml-5 w-0 flex-1">
-                    <dt className="truncate text-sm font-medium text-gray-500">{stat.name}</dt>
-                    <dd className="mt-1 text-3xl font-semibold text-gray-900">{stat.value}</dd>
+                    <dt className="truncate text-sm font-medium text-muted-foreground">{stat.name}</dt>
+                    <dd className="mt-1 text-3xl font-semibold text-card-foreground">{stat.value}</dd>
                   </div>
                 </div>
               </div>
@@ -271,15 +265,19 @@ export default function Dashboard() {
           ))}
         </div>
         
+        {/* Dashboard Layout - Two Columns for larger screens */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          {/* Main Content Column */}
+          <div className="lg:col-span-2 space-y-6">
         {/* Sales Chart */}
-        <div className="overflow-hidden rounded-lg bg-white shadow">
+        <div className="overflow-hidden rounded-lg bg-card shadow">
           <div className="p-5">
-            <h2 className="text-lg font-medium text-gray-900">Sales Overview</h2>
-            <p className="mt-1 text-sm text-gray-500">Last 7 days</p>
+            <h2 className="text-lg font-medium text-card-foreground">Sales Overview</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Last 7 days</p>
             <div className="mt-6 h-72">
               {loading ? (
                 <div className="flex h-full items-center justify-center">
-                  <p className="text-gray-500">Loading chart data...</p>
+                  <p className="text-muted-foreground">Loading chart data...</p>
                 </div>
               ) : (
                 <Line options={chartOptions} data={chartData} />
@@ -289,11 +287,11 @@ export default function Dashboard() {
         </div>
         
         {/* Recent Orders */}
-        <div className="overflow-hidden rounded-lg bg-white shadow">
-          <div className="px-5 py-4 border-b border-gray-200">
+        <div className="overflow-hidden rounded-lg bg-card shadow">
+          <div className="px-5 py-4 border-b border-border">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-medium text-gray-900">Recent Orders</h2>
-              <Link href="/dashboard/orders" className="text-sm font-medium text-blue-600 hover:text-blue-500">
+              <h2 className="text-lg font-medium text-card-foreground">Recent Orders</h2>
+              <Link href="/dashboard/orders" className="text-sm font-medium text-primary hover:text-primary/90">
                 View all
               </Link>
             </div>
@@ -304,51 +302,51 @@ export default function Dashboard() {
                 <div className="inline-block min-w-full py-2 align-middle">
                   {loading ? (
                     <div className="flex items-center justify-center py-12">
-                      <p className="text-gray-500">Loading orders...</p>
+                      <p className="text-muted-foreground">Loading orders...</p>
                     </div>
                   ) : dashboardData.recentOrders.length === 0 ? (
                     <div className="flex items-center justify-center py-12">
-                      <p className="text-gray-500">No orders yet.</p>
+                      <p className="text-muted-foreground">No orders yet.</p>
                     </div>
                   ) : (
-                    <table className="min-w-full divide-y divide-gray-300">
+                    <table className="min-w-full divide-y divide-border">
                       <thead>
                         <tr>
-                          <th className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-0">
+                          <th className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-card-foreground sm:pl-0">
                             Order ID
                           </th>
-                          <th className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+                          <th className="px-3 py-3.5 text-left text-sm font-semibold text-card-foreground">
                             Customer
                           </th>
-                          <th className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+                          <th className="px-3 py-3.5 text-left text-sm font-semibold text-card-foreground">
                             Status
                           </th>
-                          <th className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+                          <th className="px-3 py-3.5 text-left text-sm font-semibold text-card-foreground">
                             Date
                           </th>
-                          <th className="px-3 py-3.5 text-right text-sm font-semibold text-gray-900">
+                          <th className="px-3 py-3.5 text-right text-sm font-semibold text-card-foreground">
                             Amount
                           </th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-200">
+                      <tbody className="divide-y divide-border">
                         {dashboardData.recentOrders.map((order) => (
-                          <tr key={order.id} className="hover:bg-gray-50">
-                            <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-blue-600 sm:pl-0">
+                          <tr key={order.id} className="hover:bg-secondary/50">
+                            <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-primary sm:pl-0">
                               <Link href={`/dashboard/orders/${order.id}`}>
                                 #{order.id.slice(0, 8)}
                               </Link>
                             </td>
-                            <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                            <td className="whitespace-nowrap px-3 py-4 text-sm text-muted-foreground">
                               {order.customerId.slice(0, 6)}...
                             </td>
-                            <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                            <td className="whitespace-nowrap px-3 py-4 text-sm text-muted-foreground">
                               <OrderStatusBadge status={order.status} />
                             </td>
-                            <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                            <td className="whitespace-nowrap px-3 py-4 text-sm text-muted-foreground">
                               {format(new Date(order.createdAt), 'MMM dd, yyyy')}
                             </td>
-                            <td className="whitespace-nowrap px-3 py-4 text-right text-sm text-gray-900">
+                            <td className="whitespace-nowrap px-3 py-4 text-right text-sm text-card-foreground">
                               ${order.totalAmount.toFixed(2)}
                             </td>
                           </tr>
@@ -359,6 +357,18 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Sidebar Column */}
+          <div className="space-y-6">
+            {/* Low Stock Alerts */}
+            <Suspense fallback={<LoadingPlaceholder />}>
+              <LowStockAlerts />
+            </Suspense>
+            
+            {/* Additional widgets can be added here */}
           </div>
         </div>
       </div>

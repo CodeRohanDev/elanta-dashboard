@@ -2,309 +2,366 @@
 
 import { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
-import { useAuth } from '@/contexts/AuthContext';
-import { useRouter } from 'next/navigation';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import { RiPieChartLine, RiLineChartLine, RiCalendarLine } from 'react-icons/ri';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { 
+  RiLineChartLine,
+  RiMoneyDollarCircleLine,
+  RiShoppingBagLine,
+  RiPercentLine,
+  RiDownloadLine,
+  RiCalendarLine
+} from 'react-icons/ri';
+import { DateRangePicker } from '@/components/ui/date-range-picker';
+import { addDays } from 'date-fns';
+import { DateRange } from 'react-day-picker';
 import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  ArcElement,
-  Title,
+  LineChart, 
+  Line, 
+  BarChart, 
+  Bar, 
+  PieChart, 
+  Pie, 
+  Cell,
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
   Tooltip,
   Legend,
-  Filler,
-} from 'chart.js';
-import { Line, Bar, Doughnut } from 'react-chartjs-2';
+  ResponsiveContainer 
+} from 'recharts';
+import { collection, query, where, getDocs, orderBy, Timestamp } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { format } from 'date-fns';
 
-// Register Chart.js components
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  ArcElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler
-);
+interface SalesData {
+  date: string;
+  revenue: number;
+  orders: number;
+  averageOrder: number;
+}
 
-export default function AnalyticsPage() {
-  const { userData } = useAuth();
-  const router = useRouter();
+interface ProductData {
+  name: string;
+  sales: number;
+  revenue: number;
+}
+
+interface PromotionData {
+  name: string;
+  revenue: number;
+  orders: number;
+  conversion: number;
+}
+
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
+
+export default function AnalyticsDashboard() {
+  const [dateRange, setDateRange] = useState<DateRange>({
+    from: addDays(new Date(), -30),
+    to: new Date(),
+  });
+  const [salesData, setSalesData] = useState<SalesData[]>([]);
+  const [topProducts, setTopProducts] = useState<ProductData[]>([]);
+  const [promotionData, setPromotionData] = useState<PromotionData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [period, setPeriod] = useState('week');
-  const [salesData, setSalesData] = useState<any[]>([]);
-  const [productData, setProductData] = useState<any[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Redirect if not vendor
-    if (userData && userData.role !== 'vendor') {
-      router.push('/dashboard');
-      return;
-    }
-
-    async function fetchAnalyticsData() {
-      if (!userData?.id) return;
-
+    const fetchAnalyticsData = async () => {
       try {
-        // Fetch sales data
-        const salesQuery = query(
-          collection(db, 'orders'),
-          where('vendorId', '==', userData.id),
-          orderBy('createdAt', 'desc')
-        );
-        const salesSnapshot = await getDocs(salesQuery);
-        const salesData = salesSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        setSalesData(salesData);
+        setLoading(true);
+        setError(null);
 
-        // Fetch product data
-        const productsQuery = query(
-          collection(db, 'products'),
-          where('vendorId', '==', userData.id)
+        // Fetch orders within date range
+        const ordersRef = collection(db, 'orders');
+        const q = query(
+          ordersRef,
+          where('createdAt', '>=', Timestamp.fromDate(dateRange.from!)),
+          where('createdAt', '<=', Timestamp.fromDate(dateRange.to!)),
+          orderBy('createdAt', 'asc')
         );
-        const productsSnapshot = await getDocs(productsQuery);
-        const productsData = productsSnapshot.docs.map(doc => ({
+
+        const ordersSnapshot = await getDocs(q);
+        const orders = ordersSnapshot.docs.map(doc => ({
           id: doc.id,
-          ...doc.data()
+          ...doc.data(),
+          createdAt: doc.data().createdAt?.toDate()
         }));
-        setProductData(productsData);
-      } catch (error) {
-        console.error('Error fetching analytics data:', error);
+
+        // Process sales data
+        const salesByDate = orders.reduce((acc: { [key: string]: SalesData }, order: any) => {
+          const date = format(order.createdAt, 'yyyy-MM');
+          if (!acc[date]) {
+            acc[date] = {
+              date,
+              revenue: 0,
+              orders: 0,
+              averageOrder: 0
+            };
+          }
+          acc[date].revenue += order.totalAmount || 0;
+          acc[date].orders += 1;
+          acc[date].averageOrder = acc[date].revenue / acc[date].orders;
+          return acc;
+        }, {});
+
+        setSalesData(Object.values(salesByDate));
+
+        // Process top products
+        const productsMap = new Map<string, ProductData>();
+        orders.forEach((order: any) => {
+          order.items?.forEach((item: any) => {
+            if (!productsMap.has(item.productId)) {
+              productsMap.set(item.productId, {
+                name: item.productName,
+                sales: 0,
+                revenue: 0
+              });
+            }
+            const product = productsMap.get(item.productId)!;
+            product.sales += item.quantity;
+            product.revenue += item.price * item.quantity;
+          });
+        });
+
+        setTopProducts(Array.from(productsMap.values())
+          .sort((a, b) => b.revenue - a.revenue)
+          .slice(0, 5));
+
+        // Process promotion data
+        const promotionsMap = new Map<string, PromotionData>();
+        orders.forEach((order: any) => {
+          if (order.promotionCode) {
+            if (!promotionsMap.has(order.promotionCode)) {
+              promotionsMap.set(order.promotionCode, {
+                name: order.promotionCode,
+                revenue: 0,
+                orders: 0,
+                conversion: 0
+              });
+            }
+            const promotion = promotionsMap.get(order.promotionCode)!;
+            promotion.revenue += order.totalAmount || 0;
+            promotion.orders += 1;
+            // Calculate conversion rate (this would need actual promotion view data)
+            promotion.conversion = (promotion.orders / orders.length) * 100;
+          }
+        });
+
+        setPromotionData(Array.from(promotionsMap.values()));
+
+      } catch (err) {
+        console.error('Error fetching analytics data:', err);
+        setError('Failed to load analytics data');
       } finally {
         setLoading(false);
       }
-    }
+    };
 
-    if (userData?.role === 'vendor') {
+    if (dateRange.from && dateRange.to) {
       fetchAnalyticsData();
     }
-  }, [userData, router]);
+  }, [dateRange]);
 
-  // Process data for charts
-  const processChartData = () => {
-    // Sample data for demo purposes
-    const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    
-    const revenueData = {
-      labels,
-      datasets: [
-        {
-          label: 'Revenue',
-          data: [1200, 1900, 1500, 2500, 2200, 3000, 2800],
-          borderColor: 'rgb(75, 192, 192)',
-          backgroundColor: 'rgba(75, 192, 192, 0.1)',
-          tension: 0.4,
-          fill: true,
-        },
-      ],
-    };
-
-    const ordersData = {
-      labels,
-      datasets: [
-        {
-          label: 'Orders',
-          data: [12, 19, 15, 25, 22, 30, 28],
-          backgroundColor: 'rgba(54, 162, 235, 0.7)',
-        },
-      ],
-    };
-
-    const productShareData = {
-      labels: ['Product A', 'Product B', 'Product C', 'Product D', 'Others'],
-      datasets: [
-        {
-          data: [30, 25, 20, 15, 10],
-          backgroundColor: [
-            'rgba(255, 99, 132, 0.7)',
-            'rgba(54, 162, 235, 0.7)',
-            'rgba(255, 206, 86, 0.7)',
-            'rgba(75, 192, 192, 0.7)',
-            'rgba(153, 102, 255, 0.7)',
-          ],
-          borderWidth: 1,
-        },
-      ],
-    };
-
-    return { revenueData, ordersData, productShareData };
+  const handleExport = () => {
+    // Implement export functionality
+    console.log('Exporting data...');
   };
 
-  const { revenueData, ordersData, productShareData } = processChartData();
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="p-4 sm:p-6 lg:p-8">
+          <div className="flex items-center justify-center h-[80vh]">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+              <p className="mt-4 text-muted-foreground">Loading analytics data...</p>
+            </div>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
-  if (userData && userData.role !== 'vendor') {
-    return null;
+  if (error) {
+    return (
+      <DashboardLayout>
+        <div className="p-4 sm:p-6 lg:p-8">
+          <div className="flex items-center justify-center h-[80vh]">
+            <div className="text-center">
+              <p className="text-destructive">{error}</p>
+              <Button 
+                variant="outline" 
+                className="mt-4"
+                onClick={() => window.location.reload()}
+              >
+                Retry
+              </Button>
+            </div>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
   }
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-900">Analytics</h1>
-          
-          <div className="flex items-center space-x-2 bg-white rounded-md shadow p-1">
-            <button
-              onClick={() => setPeriod('week')}
-              className={`px-3 py-1.5 text-sm font-medium rounded ${
-                period === 'week' ? 'bg-blue-100 text-blue-600' : 'text-gray-700'
-              }`}
-            >
-              Week
-            </button>
-            <button
-              onClick={() => setPeriod('month')}
-              className={`px-3 py-1.5 text-sm font-medium rounded ${
-                period === 'month' ? 'bg-blue-100 text-blue-600' : 'text-gray-700'
-              }`}
-            >
-              Month
-            </button>
-            <button
-              onClick={() => setPeriod('year')}
-              className={`px-3 py-1.5 text-sm font-medium rounded ${
-                period === 'year' ? 'bg-blue-100 text-blue-600' : 'text-gray-700'
-              }`}
-            >
-              Year
-            </button>
+      <div className="p-4 sm:p-6 lg:p-8">
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl font-bold text-foreground">Analytics Dashboard</h1>
+          <div className="flex items-center gap-4">
+            <DateRangePicker
+              value={dateRange}
+              onChange={setDateRange}
+            />
+            <Button onClick={handleExport} variant="outline">
+              <RiDownloadLine className="mr-2 h-4 w-4" />
+              Export
+            </Button>
           </div>
         </div>
 
-        {loading ? (
-          <div className="flex justify-center items-center py-12">
-            <p>Loading analytics data...</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Revenue Chart */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-medium text-gray-900">Revenue</h2>
-                <RiLineChartLine className="h-5 w-5 text-gray-500" />
+        {/* Key Metrics */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+              <RiMoneyDollarCircleLine className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                ${salesData.reduce((sum, data) => sum + data.revenue, 0).toFixed(2)}
               </div>
-              <div className="h-64">
-                <Line
-                  data={revenueData}
-                  options={{
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                      legend: {
-                        display: false,
-                      },
-                    },
-                    scales: {
-                      y: {
-                        beginAtZero: true,
-                      },
-                    },
-                  }}
-                />
+              <p className="text-xs text-muted-foreground">
+                {dateRange.from && dateRange.to && 
+                  `${format(dateRange.from, 'MMM d')} - ${format(dateRange.to, 'MMM d')}`}
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
+              <RiShoppingBagLine className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {salesData.reduce((sum, data) => sum + data.orders, 0)}
               </div>
-            </div>
+              <p className="text-xs text-muted-foreground">
+                {dateRange.from && dateRange.to && 
+                  `${format(dateRange.from, 'MMM d')} - ${format(dateRange.to, 'MMM d')}`}
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Average Order Value</CardTitle>
+              <RiLineChartLine className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                ${(salesData.reduce((sum, data) => sum + data.revenue, 0) / 
+                   salesData.reduce((sum, data) => sum + data.orders, 0) || 0).toFixed(2)}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {dateRange.from && dateRange.to && 
+                  `${format(dateRange.from, 'MMM d')} - ${format(dateRange.to, 'MMM d')}`}
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Conversion Rate</CardTitle>
+              <RiPercentLine className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {((promotionData.reduce((sum, data) => sum + data.conversion, 0) / 
+                   promotionData.length) || 0).toFixed(1)}%
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {dateRange.from && dateRange.to && 
+                  `${format(dateRange.from, 'MMM d')} - ${format(dateRange.to, 'MMM d')}`}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
 
-            {/* Orders Chart */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-medium text-gray-900">Orders</h2>
-                <RiCalendarLine className="h-5 w-5 text-gray-500" />
+        {/* Charts */}
+        <div className="grid gap-4 md:grid-cols-2 mb-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Revenue Trend</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={salesData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Line type="monotone" dataKey="revenue" stroke="#8884d8" />
+                  </LineChart>
+                </ResponsiveContainer>
               </div>
-              <div className="h-64">
-                <Bar
-                  data={ordersData}
-                  options={{
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                      legend: {
-                        display: false,
-                      },
-                    },
-                    scales: {
-                      y: {
-                        beginAtZero: true,
-                      },
-                    },
-                  }}
-                />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Top Products</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={topProducts}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="revenue" fill="#8884d8" />
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
-            </div>
+            </CardContent>
+          </Card>
+        </div>
 
-            {/* Product Share */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-medium text-gray-900">Product Share</h2>
-                <RiPieChartLine className="h-5 w-5 text-gray-500" />
-              </div>
-              <div className="h-64 flex items-center justify-center">
-                <div style={{ width: '80%', height: '80%' }}>
-                  <Doughnut
-                    data={productShareData}
-                    options={{
-                      responsive: true,
-                      maintainAspectRatio: true,
-                      plugins: {
-                        legend: {
-                          position: 'right',
-                        },
-                      },
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Top Products */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-medium text-gray-900">Top Products</h2>
-              </div>
-              <div className="overflow-hidden">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Product
-                      </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Sales
-                      </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Revenue
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {[1, 2, 3, 4, 5].map((item) => (
-                      <tr key={item}>
-                        <td className="px-6 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                          Product {String.fromCharCode(64 + item)}
-                        </td>
-                        <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500">
-                          {Math.floor(Math.random() * 50) + 10}
-                        </td>
-                        <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500">
-                          ${(Math.random() * 1000 + 500).toFixed(2)}
-                        </td>
-                      </tr>
+        {/* Promotion Effectiveness */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Promotion Effectiveness</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={promotionData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="revenue"
+                    label={({ name, percent }: { name: string; percent: number }) => 
+                      `${name} ${(percent * 100).toFixed(0)}%`
+                    }
+                  >
+                    {promotionData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
-                  </tbody>
-                </table>
-              </div>
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
             </div>
-          </div>
-        )}
+          </CardContent>
+        </Card>
       </div>
     </DashboardLayout>
   );

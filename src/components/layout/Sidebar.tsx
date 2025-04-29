@@ -11,7 +11,15 @@ import {
   RiBarChartBoxLine,
   RiLogoutBoxLine,
   RiMenuFoldLine,
-  RiMenuUnfoldLine
+  RiMenuUnfoldLine,
+  RiArchiveLine,
+  RiPriceTag3Line,
+  RiMoneyDollarCircleLine,
+  RiTruckLine,
+  RiLineChartLine,
+  RiStoreLine,
+  RiCustomerServiceLine,
+  RiGlobalLine
 } from 'react-icons/ri';
 import { User } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
@@ -26,32 +34,30 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, userRole }: Sideb
   const pathname = usePathname();
   const { logout } = useAuth();
 
-  // Admin and Vendor both have access to dashboard, products, and orders
-  const sharedLinks = [
+  // Common links for all admin users
+  const commonLinks = [
     { name: 'Dashboard', href: '/dashboard', icon: RiDashboardLine },
     { name: 'Products', href: '/dashboard/products', icon: RiShoppingBag3Line },
     { name: 'Orders', href: '/dashboard/orders', icon: RiFileList3Line },
+    { name: 'Inventory', href: '/dashboard/inventory', icon: RiArchiveLine },
+    { name: 'Shipping', href: '/dashboard/shipping', icon: RiTruckLine },
   ];
 
   // Admin-specific links
   const adminLinks = [
-    { name: 'Vendors', href: '/dashboard/vendors', icon: RiStore2Line },
     { name: 'Customers', href: '/dashboard/customers', icon: RiUser3Line },
     { name: 'Categories', href: '/dashboard/categories', icon: RiBarChartBoxLine },
+    { name: 'Promotions', href: '/dashboard/promotions', icon: RiPriceTag3Line },
+    { name: 'Store Profile', href: '/dashboard/settings/store', icon: RiStore2Line },
+    { name: 'Analytics', href: '/dashboard/analytics', icon: RiLineChartLine },
+    { name: 'Support', href: '/dashboard/support', icon: RiCustomerServiceLine },
     { name: 'Settings', href: '/dashboard/settings', icon: RiSettings4Line },
-  ];
-
-  // Vendor-specific links
-  const vendorLinks = [
-    { name: 'Store Profile', href: '/dashboard/store', icon: RiStore2Line },
-    { name: 'Analytics', href: '/dashboard/analytics', icon: RiBarChartBoxLine },
-    { name: 'Settings', href: '/dashboard/settings', icon: RiSettings4Line },
+    { name: 'Currencies', href: '/dashboard/settings/currencies', icon: RiMoneyDollarCircleLine },
   ];
 
   const links = [
-    ...sharedLinks,
+    ...commonLinks,
     ...(userRole === 'admin' ? adminLinks : []),
-    ...(userRole === 'vendor' ? vendorLinks : [])
   ];
 
   return (
@@ -66,7 +72,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, userRole }: Sideb
 
       {/* Sidebar */}
       <div
-        className={`fixed inset-y-0 left-0 z-30 w-64 transform bg-white shadow-lg transition duration-300 lg:static lg:inset-0 lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-30 w-64 transform bg-sidebar border-r border-sidebar-border shadow-lg transition duration-300 lg:static lg:inset-0 lg:translate-x-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -75,14 +81,14 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, userRole }: Sideb
           <div className="flex items-center justify-between px-4 py-5">
             <Link 
               href="/dashboard" 
-              className="flex items-center space-x-2 font-bold text-xl text-blue-600"
+              className="flex items-center space-x-2 font-bold text-xl text-sidebar-primary"
             >
-              <RiStore2Line className="h-6 w-6" />
+              <RiGlobalLine className="h-6 w-6" />
               <span>Elanta</span>
             </Link>
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 lg:hidden"
+              className="rounded-md p-1.5 text-sidebar-foreground hover:bg-sidebar-accent lg:hidden"
             >
               {sidebarOpen ? <RiMenuFoldLine className="h-6 w-6" /> : <RiMenuUnfoldLine className="h-6 w-6" />}
             </button>
@@ -92,12 +98,12 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, userRole }: Sideb
           <nav className="flex-1 space-y-1 px-2 py-4">
             {links.map((link) => (
               <Link
-                key={link.name}
+                key={link.href}
                 href={link.href}
                 className={`flex items-center rounded-md px-3 py-2.5 text-sm font-medium transition-colors ${
                   pathname === link.href
-                    ? 'bg-blue-50 text-blue-600'
-                    : 'text-gray-700 hover:bg-gray-100'
+                    ? 'bg-sidebar-accent text-sidebar-primary'
+                    : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
                 }`}
               >
                 <link.icon className="mr-3 h-5 w-5" />
@@ -107,10 +113,10 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, userRole }: Sideb
           </nav>
 
           {/* Logout button */}
-          <div className="border-t border-gray-200 p-4">
+          <div className="border-t border-sidebar-border p-4">
             <button
               onClick={() => logout()}
-              className="flex w-full items-center rounded-md px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100"
+              className="flex w-full items-center rounded-md px-3 py-2.5 text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent/50"
             >
               <RiLogoutBoxLine className="mr-3 h-5 w-5" />
               Logout

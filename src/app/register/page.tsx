@@ -10,9 +10,7 @@ import {
   RiLockPasswordLine, 
   RiEyeLine, 
   RiEyeOffLine, 
-  RiUserLine,
-  RiUserStarLine, 
-  RiStore3Line 
+  RiUserLine
 } from 'react-icons/ri';
 import { User } from '@/types';
 
@@ -22,7 +20,7 @@ export default function Register() {
     password: '',
     confirmPassword: '',
     displayName: '',
-    role: 'vendor' as User['role'], // Default role is vendor for the dashboard
+    role: 'admin' as User['role'], // Only admin role is allowed
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -30,7 +28,7 @@ export default function Register() {
   const { register } = useAuth();
   const router = useRouter();
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
@@ -71,18 +69,18 @@ export default function Register() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
+    <div className="flex min-h-screen items-center justify-center bg-background px-4 py-12 sm:px-6 lg:px-8">
       <div className="w-full max-w-md space-y-8">
         <div className="text-center">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-blue-100">
-            <RiStore2Line className="h-8 w-8 text-blue-600" />
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+            <RiStore2Line className="h-8 w-8 text-primary" />
           </div>
-          <h2 className="mt-6 text-3xl font-bold tracking-tight text-gray-900">
-            Create a new account
+          <h2 className="mt-6 text-3xl font-bold tracking-tight text-foreground">
+            Create admin account
           </h2>
-          <p className="mt-2 text-sm text-gray-600">
+          <p className="mt-2 text-sm text-muted-foreground">
             Or{' '}
-            <Link href="/login" className="font-medium text-blue-600 hover:text-blue-500">
+            <Link href="/login" className="font-medium text-primary hover:text-primary/90">
               sign in to your existing account
             </Link>
           </p>
@@ -90,8 +88,8 @@ export default function Register() {
         
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           {error && (
-            <div className="rounded-md bg-red-50 p-4">
-              <div className="text-sm text-red-700">{error}</div>
+            <div className="rounded-md bg-destructive/10 p-4">
+              <div className="text-sm text-destructive">{error}</div>
             </div>
           )}
           
@@ -102,7 +100,7 @@ export default function Register() {
               </label>
               <div className="relative">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                  <RiMailLine className="h-5 w-5 text-gray-400" />
+                  <RiMailLine className="h-5 w-5 text-muted-foreground" />
                 </div>
                 <input
                   id="email"
@@ -112,7 +110,7 @@ export default function Register() {
                   required
                   value={formData.email}
                   onChange={handleChange}
-                  className="block w-full rounded-md border-0 py-2 pl-10 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm"
+                  className="block w-full rounded-md border-0 bg-background py-2 pl-10 text-foreground ring-1 ring-inset ring-input placeholder:text-muted-foreground focus:ring-2 focus:ring-inset focus:ring-primary sm:text-sm"
                   placeholder="Email address"
                 />
               </div>
@@ -124,7 +122,7 @@ export default function Register() {
               </label>
               <div className="relative">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                  <RiUserLine className="h-5 w-5 text-gray-400" />
+                  <RiUserLine className="h-5 w-5 text-muted-foreground" />
                 </div>
                 <input
                   id="displayName"
@@ -134,31 +132,9 @@ export default function Register() {
                   required
                   value={formData.displayName}
                   onChange={handleChange}
-                  className="block w-full rounded-md border-0 py-2 pl-10 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm"
+                  className="block w-full rounded-md border-0 bg-background py-2 pl-10 text-foreground ring-1 ring-inset ring-input placeholder:text-muted-foreground focus:ring-2 focus:ring-inset focus:ring-primary sm:text-sm"
                   placeholder="Full Name"
                 />
-              </div>
-            </div>
-            
-            <div>
-              <label htmlFor="role" className="sr-only">
-                Account Type
-              </label>
-              <div className="relative">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                  <RiUserStarLine className="h-5 w-5 text-gray-400" />
-                </div>
-                <select
-                  id="role"
-                  name="role"
-                  required
-                  value={formData.role}
-                  onChange={handleChange}
-                  className="block w-full rounded-md border-0 py-2 pl-10 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm"
-                >
-                  <option value="vendor">Vendor</option>
-                  <option value="admin">Admin</option>
-                </select>
               </div>
             </div>
             
@@ -168,7 +144,7 @@ export default function Register() {
               </label>
               <div className="relative">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                  <RiLockPasswordLine className="h-5 w-5 text-gray-400" />
+                  <RiLockPasswordLine className="h-5 w-5 text-muted-foreground" />
                 </div>
                 <input
                   id="password"
@@ -178,7 +154,7 @@ export default function Register() {
                   required
                   value={formData.password}
                   onChange={handleChange}
-                  className="block w-full rounded-md border-0 py-2 pl-10 pr-10 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm"
+                  className="block w-full rounded-md border-0 bg-background py-2 pl-10 pr-10 text-foreground ring-1 ring-inset ring-input placeholder:text-muted-foreground focus:ring-2 focus:ring-inset focus:ring-primary sm:text-sm"
                   placeholder="Password"
                 />
                 <button
@@ -187,9 +163,9 @@ export default function Register() {
                   onClick={() => setShowPassword(!showPassword)}
                 >
                   {showPassword ? (
-                    <RiEyeOffLine className="h-5 w-5 text-gray-400" />
+                    <RiEyeOffLine className="h-5 w-5 text-muted-foreground" />
                   ) : (
-                    <RiEyeLine className="h-5 w-5 text-gray-400" />
+                    <RiEyeLine className="h-5 w-5 text-muted-foreground" />
                   )}
                 </button>
               </div>
@@ -201,7 +177,7 @@ export default function Register() {
               </label>
               <div className="relative">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                  <RiLockPasswordLine className="h-5 w-5 text-gray-400" />
+                  <RiLockPasswordLine className="h-5 w-5 text-muted-foreground" />
                 </div>
                 <input
                   id="confirmPassword"
@@ -211,7 +187,7 @@ export default function Register() {
                   required
                   value={formData.confirmPassword}
                   onChange={handleChange}
-                  className="block w-full rounded-md border-0 py-2 pl-10 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm"
+                  className="block w-full rounded-md border-0 bg-background py-2 pl-10 text-foreground ring-1 ring-inset ring-input placeholder:text-muted-foreground focus:ring-2 focus:ring-inset focus:ring-primary sm:text-sm"
                   placeholder="Confirm Password"
                 />
               </div>
@@ -222,9 +198,9 @@ export default function Register() {
             <button
               type="submit"
               disabled={loading}
-              className="group relative flex w-full justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:bg-blue-300"
+              className="group relative flex w-full justify-center rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:bg-primary/70"
             >
-              {loading ? 'Creating Account...' : 'Create Account'}
+              {loading ? 'Creating Account...' : 'Create Admin Account'}
             </button>
           </div>
         </form>

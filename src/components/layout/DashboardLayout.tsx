@@ -15,23 +15,38 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   // Use useEffect for navigation instead of during render
   useEffect(() => {
-    if (!loading && !userData) {
-      router.push('/login');
+    if (!loading) {
+      if (!userData) {
+        // Redirect to login if not authenticated
+        router.push('/login');
+      } else if (userData.role !== 'admin') {
+        // Redirect non-admin users
+        router.push('/access-denied');
+      }
     }
   }, [loading, userData, router]);
 
   // Return loading state or null while checking auth
-  if (!loading && !userData) {
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-t-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  // Don't render dashboard for non-admins
+  if (!userData || userData.role !== 'admin') {
     return null;
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-background">
       {/* Sidebar */}
       <Sidebar 
         sidebarOpen={sidebarOpen} 
         setSidebarOpen={setSidebarOpen} 
-        userRole={userData?.role} 
+        userRole={userData.role} 
       />
 
       {/* Main Content */}
@@ -42,7 +57,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           user={userData} 
         />
         
-        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 p-4 md:p-6">
+        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-secondary/20 p-4 md:p-6">
           {children}
         </main>
       </div>

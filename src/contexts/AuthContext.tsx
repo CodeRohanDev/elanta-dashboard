@@ -50,7 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       id: userCredential.user.uid,
       email: email,
       displayName: displayName,
-      role: role,
+      role: role, // Now only admin or customer
       createdAt: new Date().toISOString(),
     };
     
